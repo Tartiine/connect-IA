@@ -13,21 +13,6 @@ player_type = ['human']
 for i in range(42):
     player_type.append('AI: alpha-beta level '+str(i+1))
 
-import tkinter as tk
-from tkinter import ttk
-import numpy as np
-import random as rnd
-from threading import Thread
-from queue import Queue
-
-
-disk_color = ['white', 'red', 'orange']
-disks = list()
-
-player_type = ['human']
-for i in range(42):
-    player_type.append('AI: alpha-beta level '+str(i+1))
-
 def alpha_beta_decision(board, turn, ai_level, queue, current_player):
     depth = ai_level
     max_player = current_player == 1
