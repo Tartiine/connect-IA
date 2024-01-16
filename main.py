@@ -13,79 +13,60 @@ player_type = ['human']
 for i in range(42):
     player_type.append('AI: alpha-beta level '+str(i+1))
 
-def alpha_beta_decision(board, turn, ai_level, queue, current_player):
+def alpha_beta_decision(board, turn, ai_level, queue, max_player):
     depth = ai_level
-    max_player = current_player == 1
-    value = float('-inf')
-    column = board.get_possible_moves()[0]
+    alpha = float('-inf')
+    beta = float('inf')
 
-    for col in board.get_possible_moves():
-        # Make a copy of the board for simulation
-        b_copy = board.copy()
-        row = b_copy.add_disk(col, current_player, update_display=False)
-        new_score = minimax(b_copy, depth - 1, float('-inf'), float('inf'), not max_player, current_player)[1]
-
-        if (max_player and new_score > value) or (not max_player and new_score < value):
-            value = new_score
-            column = col
-
-        if (max_player and value == float('inf')) or (not max_player and value == float('-inf')):
-            break
-
-    # Put the AI move into the queue after trying all possible moves
+    column, _ = minimax(board, depth, alpha, beta, max_player, max_player)
     queue.put(column)
 
 
+def minimax(board, depth, alpha, beta, maximizingPlayer, max_player):
+    validLocations = board.get_possible_moves()
+    isTerminal = board.check_victory() or (depth == 0)
 
-def minimax(board, depth, alpha, beta, maximizing_player, current_player):
-    valid_locations = board.get_possible_moves()
-    is_terminal = board.check_victory()
-
-    if depth == 0 or is_terminal:
-        if is_terminal:
-            if board.check_victory():
-                return [-1, float('inf')]
+    if isTerminal:
+        if board.check_victory():
+            if max_player == 1:
+                return [-1, float('-inf')]
             else:
-                return [-1, 0]
+                return [-1, float('inf')]
         else:
-            return [-1, board.eval(current_player)]
-
-    if maximizing_player:
-        value = float('-inf')
-        column = valid_locations[0]
-        for col in valid_locations:
-            # Remove the line that gets the next open row
-            b_copy = board.copy()
-            b_copy.add_disk(col, current_player)
-            new_score = minimax(b_copy, depth - 1, alpha, beta, False, current_player)[1]
-
-            if new_score > value:
-                value = new_score
-                column = col
-
-            alpha = max(alpha, value)
-            if alpha >= beta:
-                break
-
-        return [column, value]
+            return [-1, 0]
     else:
-        value = float('inf')
-        column = valid_locations[0]
-        for col in valid_locations:
-            # Remove the line that gets the next open row
-            b_copy = board.copy()
-            b_copy.add_disk(col, current_player)
-            new_score = minimax(b_copy, depth - 1, float('-inf'), float('inf'), True, current_player)[1]
+        if not validLocations:  # No valid moves, return an arbitrary column
+            return [0, 0]
 
-            if new_score < value:
-                value = new_score
-                column = col
+        if maximizingPlayer:
+            value = float('-inf')
+            column = validLocations[0]
+            for col in validLocations:
+                bCopy = board.copy()
+                bCopy.add_disk(col, max_player, update_display=False)
+                newScore = minimax(bCopy, depth - 1, alpha, beta, False, max_player)[1]
+                if newScore > value:
+                    value = newScore
+                    column = col
+                alpha = max(alpha, value)
+                if alpha >= beta:
+                    break
+            return [column, value]
+        else:
+            value = float('inf')
+            column = validLocations[0]
+            for col in validLocations:
+                bCopy = board.copy()
+                bCopy.add_disk(col, 2 if max_player == 1 else 1, update_display=False)
+                newScore = minimax(bCopy, depth - 1, alpha, beta, True, max_player)[1]
+                if newScore < value:
+                    value = newScore
+                    column = col
+                beta = min(beta, value)
+                if alpha >= beta:
+                    break
+            return [column, value]
 
-            beta = min(beta, value)
-            if alpha >= beta:
-                break
-
-        return [column, value]
 
 
 class Board:
@@ -94,52 +75,34 @@ class Board:
 
     def eval(self, player):
         score = 0
-        center_column = len(self.grid[0]) // 2
-        center_array = [self.grid[i][center_column] for i in range(len(self.grid))]
-        center_count = center_array.count(player)
-        score += center_count * 3
 
-        for r in range(len(self.grid)):
-            for c in range(len(self.grid[0]) - 3 + 1):
-                window = self.grid[r, c:c + 4]
+        # Evaluate horizontally
+        for row in range(6):
+            for col in range(4):
+                window = self.grid[col:col + 4, row]
                 score += self.evaluate_window(window, player)
 
-        for c in range(len(self.grid[0])):
-            for r in range(len(self.grid) - 3 + 1):
-                window = self.grid[r:r + 4, c]
-                score += self.evaluate_window(window, player)
-
-        for r in range(len(self.grid) - 3):
-            for c in range(len(self.grid[0]) - 3):
-                window = [self.grid[r + i][c + i] for i in range(4)]
-                score += self.evaluate_window(window, player)
-
-        for r in range(len(self.grid) - 3):
-            for c in range(3, len(self.grid[0])):
-                window = [self.grid[r + i][c - i] for i in range(4)]
+        # Evaluate vertically
+        for col in range(7):
+            for row in range(3):
+                window = self.grid[col, row:row + 4]
                 score += self.evaluate_window(window, player)
 
         return score
 
     def evaluate_window(self, window, player):
-        score = 0
-        opp_player = 2 if player == 1 else 1
+        opponent = 3 - player  # Assuming player values are 1 and 2
 
-        my_count = np.count_nonzero(window == player)
-        opp_count = np.count_nonzero(window == opp_player)
-        empty_count = np.count_nonzero(window == 0)
+        if window.count(player) == 4:
+            return 100
+        elif window.count(player) == 3 and window.count(0) == 1:
+            return 5
+        elif window.count(player) == 2 and window.count(0) == 2:
+            return 2
+        elif window.count(opponent) == 3 and window.count(0) == 1:
+            return -4
 
-        if my_count == 4:
-            score += 100
-        elif my_count == 3 and empty_count == 1:
-            score += 5
-        elif my_count == 2 and empty_count == 2:
-            score += 2
-
-        if opp_count == 3 and empty_count == 1:
-            score -= 3
-
-        return score
+        return 0
 
     def copy(self):
         new_board = Board()
