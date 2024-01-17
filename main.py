@@ -72,37 +72,75 @@ def minimax(board, depth, alpha, beta, maximizingPlayer, max_player):
 class Board:
     grid = np.array([[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0],
                      [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]])
+    WINDOW_LENGTH, WINDOW_HEIGHT = grid.shape
 
     def eval(self, player):
+        return self.score_position(player)
+
+    def score_position(self, player):
+        piece = player
         score = 0
 
-        # Evaluate horizontally
-        for row in range(6):
-            for col in range(4):
-                window = self.grid[col:col + 4, row]
-                score += self.evaluate_window(window, player)
+        center_column = len(self.grid[0]) // 2
+        center_array = [self.grid[i][center_column] for i in range(len(self.grid))]
+        center_count = center_array.count(piece)
+        score += center_count * 3
 
-        # Evaluate vertically
-        for col in range(7):
-            for row in range(3):
-                window = self.grid[col, row:row + 4]
-                score += self.evaluate_window(window, player)
+        # Score Horizontal and Vertical
+        for r in range(len(self.grid)):
+            for c in range(len(self.grid[0]) - self.WINDOW_LENGTH + 1):
+                horizontal_window = self.grid[r][c:c + self.WINDOW_LENGTH]
+                vertical_window = [self.grid[i][c] for i in range(r, r + self.WINDOW_LENGTH)]
+                score += self.evaluate_window(horizontal_window, piece)
+                score += self.evaluate_window(vertical_window, piece)
+
+        # Score positive sloped diagonal and negative sloped diagonal
+        for r in range(len(self.grid) - self.WINDOW_LENGTH + 1):
+            for c in range(len(self.grid[0]) - self.WINDOW_LENGTH + 1):
+                pos_slope_window = [self.grid[r + i][c + i] for i in range(self.WINDOW_LENGTH)]
+                neg_slope_window = [self.grid[r + i][c + self.WINDOW_LENGTH - 1 - i] for i in range(self.WINDOW_LENGTH)]
+                score += self.evaluate_window(pos_slope_window, piece)
+                score += self.evaluate_window(neg_slope_window, piece)
 
         return score
 
-    def evaluate_window(self, window, player):
-        opponent = 3 - player  # Assuming player values are 1 and 2
+    def immediate_threat_column(self, opp_piece):
+        for c in range(Board.WINDOW_LENGTH):
+            for r in range(Board.WINDOW_HEIGHT):
+                window = self.get_window(c, r)
+                if window is None:
+                    continue
 
-        if window.count(player) == 4:
-            return 100
-        elif window.count(player) == 3 and window.count(0) == 1:
-            return 5
-        elif window.count(player) == 2 and window.count(0) == 2:
-            return 2
-        elif window.count(opponent) == 3 and window.count(0) == 1:
-            return -4
+                if self.count_occurrences(window, opp_piece) == 3 and self.count_occurrences(window, 0) == 1:
+                    empty_index = self.find_empty_index(window)
+                    if r + empty_index < Board.WINDOW_HEIGHT and self.grid[r + empty_index][c] == 0:
+                        return c
 
-        return 0
+        return -1
+
+    def evaluate_window(self, window, piece):
+        score = 0
+        opp_piece = 1 if piece == 2 else 2
+
+        my_count = window.count(piece)
+        opp_count = window.count(opp_piece)
+        empty_count = window.count(0)
+
+        if my_count == 4:
+            score += 100
+        elif my_count == 3 and empty_count == 1:
+            score += 5
+        elif my_count == 2 and empty_count == 2:
+            score += 2
+
+        if opp_count == 3 and empty_count == 1:
+            score -= 3
+
+        immediate_threat = immediate_threat_column(self, piece)
+        if immediate_threat != -1:
+            score += 100000000
+
+        return score
 
     def copy(self):
         new_board = Board()
