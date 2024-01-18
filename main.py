@@ -108,10 +108,13 @@ class Board:
         for r in range(self.LINE_COUNT):
             for c in range(self.COLUMN_COUNT - self.WINDOW_LENGTH + 1):
                 horizontal_window = self.grid[r][c:c + self.WINDOW_LENGTH]
-                vertical_window = [self.grid[i][c] for i in range(r, r + self.WINDOW_LENGTH) if
-                                   0 <= i < self.LINE_COUNT]
                 if len(horizontal_window) == self.WINDOW_LENGTH:
                     score += self.evaluate_window(horizontal_window, piece)
+
+        for r in range(self.LINE_COUNT):
+            for c in range(self.COLUMN_COUNT - self.WINDOW_LENGTH + 1):
+                vertical_window = [self.grid[i][c] for i in range(r, r + self.WINDOW_LENGTH) if
+                                   0 <= i < self.LINE_COUNT]
                 if len(vertical_window) == self.WINDOW_LENGTH:
                     score += self.evaluate_window(vertical_window, piece)
 
