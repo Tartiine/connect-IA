@@ -90,9 +90,9 @@ def minimax(board, depth, alpha, beta, maximizingPlayer, max_player):
 class Board:
     grid = np.array([[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0],
                      [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]])
-    WINDOW_LENGTH, WINDOW_HEIGHT = grid.shape
-    #Instead use game_length and game_height for the score_position
-    
+    WINDOW_LENGTH=4
+    COLUMN_COUNT=7
+    LINE_COUNT=6
 
     def eval(self, player):
         return self.score_position(player)
@@ -105,24 +105,26 @@ class Board:
         center_count = center_array.count(piece)
         score += center_count * 3
 
-        for r in range(len(self.grid)):
-            for c in range(len(self.grid[0]) - self.WINDOW_LENGTH + 1):
-                print("HELLOO") 
+        for r in range(self.LINE_COUNT):
+            for c in range(self.COLUMN_COUNT - self.WINDOW_LENGTH + 1):
                 horizontal_window = self.grid[r][c:c + self.WINDOW_LENGTH]
-                vertical_window = [self.grid[i][c] for i in range(r, r + self.WINDOW_LENGTH)]
-                score += self.evaluate_window(horizontal_window, piece)
-                score += self.evaluate_window(vertical_window, piece)
+                vertical_window = [self.grid[i][c] for i in range(r, r + self.WINDOW_LENGTH) if
+                                   0 <= i < self.LINE_COUNT]
+                if len(horizontal_window) == self.WINDOW_LENGTH:
+                    score += self.evaluate_window(horizontal_window, piece)
+                if len(vertical_window) == self.WINDOW_LENGTH:
+                    score += self.evaluate_window(vertical_window, piece)
 
-        for r in range(len(self.grid) - self.WINDOW_LENGTH + 1):
-            for c in range(len(self.grid[0]) - self.WINDOW_LENGTH + 1):
-                pos_slope_window = [self.grid[r + i][c + i] for i in range(self.WINDOW_LENGTH)]
-                neg_slope_window = [self.grid[r + i][c + self.WINDOW_LENGTH - 1 - i] for i in range(self.WINDOW_LENGTH)]
-                score += self.evaluate_window(pos_slope_window, piece)
-                score += self.evaluate_window(neg_slope_window, piece)
+        for r in range(self.LINE_COUNT - self.WINDOW_LENGTH + 1):
+            for c in range(self.COLUMN_COUNT - self.WINDOW_LENGTH + 1):
+                if (r + self.WINDOW_LENGTH <= self.LINE_COUNT) and (c + self.WINDOW_LENGTH <= self.COLUMN_COUNT):
+                    pos_slope_window = [self.grid[r + i][c + i] for i in range(self.WINDOW_LENGTH) if
+                                        0 <= r + i < self.LINE_COUNT and 0 <= c + i < self.COLUMN_COUNT - self.WINDOW_LENGTH + 1]
+                    if len(pos_slope_window) == self.WINDOW_LENGTH:
+                        score += self.evaluate_window(pos_slope_window, piece)
 
         return score
 
-    
     def remove_disk(self, column):
         for j in range(5, -1, -1):
             if self.grid[column][j] != 0:
@@ -131,34 +133,30 @@ class Board:
 
     def evaluate_window(self, window, piece):
         score = 0
-        print("HELLOO")
         opp_piece = 1 if piece == 2 else 2
-    
-        my_count = window.count(piece)
-        opp_count = window.count(opp_piece)
-        empty_count = window.count(0)
-    
+
+        my_count = np.count_nonzero(window == piece)
+        opp_count = np.count_nonzero(window == opp_piece)
+        empty_count = np.count_nonzero(window == 0)
+
         if my_count == 4:
             score += 100
         elif my_count == 3 and empty_count == 1:
-            score += 10  
-    
+            score += 10
+
         if opp_count == 3 and empty_count == 1:
-            score -= 100  
-    
+            score -= 100
 
         if my_count == 2 and empty_count == 2:
-            score += 5  
+            score += 5
         if opp_count == 2 and empty_count == 2:
             score -= 5
-    
+
         # Center control
         center_column = len(self.grid[0]) // 2
-        center_count = window.count(piece)
-        score += center_count * 3 
+        center_count = np.count_nonzero(window == piece)
+        score += center_count * 3
         return score
-
-
 
     def copy(self):
         new_board = Board()
