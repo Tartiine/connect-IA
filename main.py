@@ -22,57 +22,77 @@ def alpha_beta_decision(board, turn, ai_level, queue, max_player):
     queue.put(column)
 
 
+memoization = {}
+
 def minimax(board, depth, alpha, beta, maximizingPlayer, max_player):
+    global memoization
+    board_key = str(board.grid)
+    if depth == 0 or board.check_victory():
+            return [-1, board.score_position(max_player)]
+    if (board_key, depth, maximizingPlayer) in memoization:
+        return memoization[(board_key, depth, maximizingPlayer)]
+
     validLocations = board.get_possible_moves()
     isTerminal = board.check_victory() or (depth == 0)
 
     if isTerminal:
         if board.check_victory():
             if max_player == 1:
-                return [-1, float('-inf')]
+                result = [-1, float('-inf')]
             else:
-                return [-1, float('inf')]
+                result = [-1, float('inf')]
         else:
-            return [-1, 0]
+            result = [-1, 0]
     else:
-        if not validLocations:  # No valid moves, return an arbitrary column
-            return [0, 0]
-
-        if maximizingPlayer:
+        if not validLocations:
+            result = [0, 0]
+        elif maximizingPlayer:
             value = float('-inf')
             column = validLocations[0]
             for col in validLocations:
-                bCopy = board.copy()
-                bCopy.add_disk(col, max_player, update_display=False)
-                newScore = minimax(bCopy, depth - 1, alpha, beta, False, max_player)[1]
+                # Make the move
+                board.add_disk(col, max_player, update_display=False)
+                newScore = minimax(board, depth - 1, alpha, beta, False, max_player)[1]
+
+                # Undo the move
+                board.remove_disk(col)
+
                 if newScore > value:
                     value = newScore
                     column = col
                 alpha = max(alpha, value)
                 if alpha >= beta:
                     break
-            return [column, value]
+            result = [column, value]
         else:
             value = float('inf')
             column = validLocations[0]
             for col in validLocations:
-                bCopy = board.copy()
-                bCopy.add_disk(col, 2 if max_player == 1 else 1, update_display=False)
-                newScore = minimax(bCopy, depth - 1, alpha, beta, True, max_player)[1]
+                # Make the move
+                board.add_disk(col, 2 if max_player == 1 else 1, update_display=False)
+                newScore = minimax(board, depth - 1, alpha, beta, True, max_player)[1]
+
+                # Undo the move
+                board.remove_disk(col)
+
                 if newScore < value:
                     value = newScore
                     column = col
                 beta = min(beta, value)
                 if alpha >= beta:
                     break
-            return [column, value]
+            result = [column, value]
 
+    memoization[(board_key, depth, maximizingPlayer)] = result
+    return result
 
 
 class Board:
     grid = np.array([[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0],
                      [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]])
     WINDOW_LENGTH, WINDOW_HEIGHT = grid.shape
+    #Instead use game_length and game_height for the score_position
+    
 
     def eval(self, player):
         return self.score_position(player)
@@ -80,21 +100,19 @@ class Board:
     def score_position(self, player):
         piece = player
         score = 0
-
         center_column = len(self.grid[0]) // 2
         center_array = [self.grid[i][center_column] for i in range(len(self.grid))]
         center_count = center_array.count(piece)
         score += center_count * 3
 
-        # Score Horizontal and Vertical
         for r in range(len(self.grid)):
             for c in range(len(self.grid[0]) - self.WINDOW_LENGTH + 1):
+                print("HELLOO") 
                 horizontal_window = self.grid[r][c:c + self.WINDOW_LENGTH]
                 vertical_window = [self.grid[i][c] for i in range(r, r + self.WINDOW_LENGTH)]
                 score += self.evaluate_window(horizontal_window, piece)
                 score += self.evaluate_window(vertical_window, piece)
 
-        # Score positive sloped diagonal and negative sloped diagonal
         for r in range(len(self.grid) - self.WINDOW_LENGTH + 1):
             for c in range(len(self.grid[0]) - self.WINDOW_LENGTH + 1):
                 pos_slope_window = [self.grid[r + i][c + i] for i in range(self.WINDOW_LENGTH)]
@@ -104,43 +122,43 @@ class Board:
 
         return score
 
-    def immediate_threat_column(self, opp_piece):
-        for c in range(Board.WINDOW_LENGTH):
-            for r in range(Board.WINDOW_HEIGHT):
-                window = self.get_window(c, r)
-                if window is None:
-                    continue
-
-                if self.count_occurrences(window, opp_piece) == 3 and self.count_occurrences(window, 0) == 1:
-                    empty_index = self.find_empty_index(window)
-                    if r + empty_index < Board.WINDOW_HEIGHT and self.grid[r + empty_index][c] == 0:
-                        return c
-
-        return -1
+    
+    def remove_disk(self, column):
+        for j in range(5, -1, -1):
+            if self.grid[column][j] != 0:
+                self.grid[column][j] = 0
+                break
 
     def evaluate_window(self, window, piece):
         score = 0
+        print("HELLOO")
         opp_piece = 1 if piece == 2 else 2
-
+    
         my_count = window.count(piece)
         opp_count = window.count(opp_piece)
         empty_count = window.count(0)
-
+    
         if my_count == 4:
             score += 100
         elif my_count == 3 and empty_count == 1:
-            score += 5
-        elif my_count == 2 and empty_count == 2:
-            score += 2
-
+            score += 10  
+    
         if opp_count == 3 and empty_count == 1:
-            score -= 3
+            score -= 100  
+    
 
-        immediate_threat = immediate_threat_column(self, piece)
-        if immediate_threat != -1:
-            score += 100000000
-
+        if my_count == 2 and empty_count == 2:
+            score += 5  
+        if opp_count == 2 and empty_count == 2:
+            score -= 5
+    
+        # Center control
+        center_column = len(self.grid[0]) // 2
+        center_count = window.count(piece)
+        score += center_count * 3 
         return score
+
+
 
     def copy(self):
         new_board = Board()
